@@ -1,0 +1,39 @@
+name: CI/CD Pipeline - Run Jest on PR
+
+on:
+  pull_request:
+    branches:
+      - main # This workflow runs when a PR targets the 'main' branch
+
+jobs:
+  test:
+    name: Run Jest Tests
+    runs-on: ubuntu-latest # Or windows-latest, macos-latest depending on your needs
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Action to check out your repository code
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Specify your Node.js version (e.g., '16', '18', '20')
+          cache: 'npm' # Cache npm dependencies for faster builds
+
+      - name: Install dependencies
+        run: npm ci # Use 'npm ci' for clean and consistent installs in CI environments
+
+      - name: Run Jest tests
+        run: npm test # Or `npx jest` if you don't have a 'test' script in package.json
+        env:
+          CI: true # Set CI environment variable for Jest (often makes it run once and exit)
+
+      - name: Jest tests passed
+        if: success()
+        run: echo "✅ Jest tests passed successfully!" # Message when tests pass
+
+      - name: Jest tests failed
+        if: failure()
+        run: |
+          echo "❌ Jest tests failed! Please check the logs above."
+          exit 1 # Explicitly fail the job if tests failed
