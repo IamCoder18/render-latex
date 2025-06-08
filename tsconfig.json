@@ -3,7 +3,7 @@
       "rootDir": "./src",
       "outDir": "./dist",
       "target": "ES2016",
-      "module": "CommonJS",
+      "module": "es2022",
       "lib": ["ESNext", "ES2021"],
       "strict": true,
       "allowJs": true,
