@@ -1,0 +1,32 @@
+{
+    "name": "render-latex",
+    "version": "1.0.1",
+    "description": "Parse and render LaTeX easily with KaTeX",
+    "license": "ISC",
+    "author": "Aarav Sharma (iamcoder18)",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "package.json",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "dev": "tsc && node ./dist/index.js",
+        "build": "tsc",
+        "test": "jest --coverage",
+        "test:serve": "jest --coverage && cd ./coverage/lcov-report && echo \"Code coverage server running at http://$(hostname -I | awk '{print $1}'):8005/\nHit CTRL-C to stop the server\" && npx http-server -p 8005 -s"
+    },
+    "devDependencies": {
+        "@types/jest": "^29.5.14",
+        "@types/katex": "^0.16.7",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.3.4",
+        "typescript": "^5.0.0"
+    },
+    "dependencies": {
+        "katex": "^0.16.22"
+    }
+}
