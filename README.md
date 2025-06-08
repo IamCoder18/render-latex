@@ -36,20 +36,9 @@ import { renderMath } from 'render-latex';
 
 const inputText = `
 This is a paragraph with inline math like $E=mc^2$.
-We can also have display math:
 $$
 \\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}
 $$
-Escaped dollars like \\$5 should be ignored. Backslashes \\\\ need care too.
-Let's use other delimiters: \\( a^2 + b^2 = c^2 \\) and
-\\[
-\\sum_{i=1}^n i = \\frac{n(n+1)}{2}
-\\]
-Finally, an align environment:
-\\begin{align*}
-f(x) &= x^2 \\\\
-g(x) &= \\frac{1}{x}
-\\end{align*}
 More text after math.
 `;
 
