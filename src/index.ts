@@ -5,6 +5,7 @@ interface Delimiter {
     end: string;
     type: 'display' | 'inline';
     customRegex?: RegExp;
+    compiledRegex?: RegExp; // Added for pre-compiled regex
 }
 
 interface ParsedSegment {
@@ -19,6 +20,21 @@ interface Match {
     start: number;
     end: number;
 }
+
+// Named constants for better readability
+const BACKSLASH_PLACEHOLDER = '𜰀'; // Placeholder for a literal backslash
+const DOLLAR_PLACEHOLDER = '𜰃';   // Placeholder for a literal dollar sign
+
+/**
+ * Escapes characters that have special meaning in regular expressions.
+ * Use this function to match a literal string that might contain characters
+ * like `.` `*` `+` `?` `^` `$` `{` `}` `(` `)` `|` `[` `]` `\`.
+ * @param string - The string to escape.
+ * @returns The string with special regex characters escaped.
+ */
+const escapeRegex = (string: string): string => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
 
 const delimiters: Delimiter[] = [
     { start: '$$', end: '$$', type: 'display' },
@@ -37,7 +53,19 @@ const delimiters: Delimiter[] = [
         type: 'display',
         customRegex: /(?:\\begin{align})([\s\S]*?)(?:\\end{align})/g,
     },
-];
+].map(d => ({
+    ...d,
+    // Explicitly cast the 'type' to ensure correct literal type inference
+    type: d.type as 'display' | 'inline',
+    // Pre-compile regex for efficiency
+    compiledRegex: d.customRegex
+        ? new RegExp(d.customRegex.source, 'g') // Ensure global flag for iteration
+        : new RegExp(
+              String.raw`(?:${escapeRegex(d.start)})([\s\S]*?)(?:${escapeRegex(d.end)})`,
+              'g'
+          ),
+}));
+
 
 /**
  * The escaping mechanism relies on replacing specific sequences (like `\$` or `\\`)
@@ -48,37 +76,30 @@ const delimiters: Delimiter[] = [
 
 // Maps sequences to escape to a temporary placeholder character.
 const escapes: Record<string, string> = {
-    '\\\\': '𜰀', // Placeholder for a literal backslash
-    '\\$': '𜰃',  // Placeholder for a literal dollar sign
+    '\\\\': BACKSLASH_PLACEHOLDER,
+    '\\$': DOLLAR_PLACEHOLDER,
 };
 
 // Reverses the `escapes` mapping for plain text segments.
 const unEscapes: Record<string, string> = {
-    '𜰀': '\\',
-    '𜰃': '$',
+    [BACKSLASH_PLACEHOLDER]: '\\',
+    [DOLLAR_PLACEHOLDER]: '$',
 };
 
 // Reverses the `escapes` mapping for math segments.
 // A literal backslash in LaTeX is `\\`, so we map the placeholder to `\\\\`.
 const mathUnEscapes: Record<string, string> = {
-    '𜰀': '\\\\',
-    '𜰃': '$',
+    [BACKSLASH_PLACEHOLDER]: '\\\\',
+    [DOLLAR_PLACEHOLDER]: '$',
 };
 
 // Helper arrays derived from the escape maps.
 const escapedSequences: string[] = Object.values(escapes);
 const escapeSequences: string[] = Object.keys(escapes);
 
-/**
- * Escapes characters that have special meaning in regular expressions.
- * Use this function to match a literal string that might contain characters
- * like `.` `*` `+` `?` `^` `$` `{` `}` `(` `)` `|` `[` `]` `\`.
- * @param string - The string to escape.
- * @returns The string with special regex characters escaped.
- */
-const escapeRegex = (string: string): string => {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-};
+// Pre-compile a single regex for efficient unescaping in text and math
+const unescapeAllPlaceholdersRegex = new RegExp(`(${escapedSequences.map(s => escapeRegex(s)).join('|')})`, 'g');
+
 
 /**
  * Replaces a predefined escape sequence (e.g., `\$`) with its corresponding
@@ -104,11 +125,7 @@ const replacePredefinedEscapeSequences = (input: string, sequenceToReplace: stri
  * @returns The unescaped string.
  */
 const unescapeCharacters = (input: string): string => {
-    let unescaped = input;
-    escapedSequences.forEach((sequence: string) => {
-        unescaped = unescaped.replaceAll(sequence, unEscapes[sequence]);
-    });
-    return unescaped;
+    return input.replace(unescapeAllPlaceholdersRegex, (match: string) => unEscapes[match]);
 };
 
 /**
@@ -119,11 +136,8 @@ const unescapeCharacters = (input: string): string => {
  * @returns The reverted string, ready for KaTeX rendering.
  */
 const revertEscapedCharacters = (input: string): string => {
-    let unescaped = input;
-    escapedSequences.forEach((sequence: string) => {
-        unescaped = unescaped.replaceAll(sequence, mathUnEscapes[sequence]);
-    });
-    return unescaped;
+    // Optimized: Use a single replace with a replacer function
+    return input.replace(unescapeAllPlaceholdersRegex, (match: string) => mathUnEscapes[match]);
 };
 
 /**
@@ -141,18 +155,14 @@ const parseDelimiters = (input: string): ParsedSegment[] => {
 
     // Step 1: Find all possible matches for all defined delimiters.
     delimiters.forEach((delimiter: Delimiter) => {
-        const delimiterRegex = delimiter.customRegex
-            ? new RegExp(delimiter.customRegex.source, 'g')
-            : new RegExp(
-                String.raw`(?:${escapeRegex(delimiter.start)})([\s\S]*?)(?:${escapeRegex(delimiter.end)})`,
-                'g'
-            );
+        // Use the pre-compiled regex
+        const delimiterRegex = delimiter.compiledRegex!;
+        delimiterRegex.lastIndex = 0; // Reset lastIndex for exec method in a loop
 
         let match: RegExpExecArray | null;
         while ((match = delimiterRegex.exec(input)) !== null) {
             const startIndex = match.index;
             const fullMatchContent = match[0];
-            // For custom regex, the content is the full match; otherwise, it's the first capture group.
             const contentToExtract = delimiter.customRegex ? fullMatchContent : match[1];
             const endIndex = startIndex + fullMatchContent.length;
 
