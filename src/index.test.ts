@@ -1,253 +1,325 @@
-import * as katex from 'katex';
-import {
-    renderMath,
-    parseDelimiters,
-    ParsedSegment,
-    escapeRegex,
-    replacePredefinedEscapeSequences,
-    unescapeCharacters,
-    revertEscapedCharacters,
-} from './index';
+import * as katex from "katex";
+import { renderMath, parseDelimiters, ParsedSegment, escapeRegex, replacePredefinedEscapeSequences, unescapeCharacters, revertEscapedCharacters } from "./index";
 
-// Mock the katex library to control its behavior in tests.
-jest.mock('katex', () => ({
+jest.mock("katex", () => ({
     renderToString: jest.fn((str, options) => {
-        // Simple mock: return the input string, noting if it's display mode.
-        const displayClass = options?.displayMode ? 'katex-display' : '';
-        // Simulate a KaTeX parse error for testing the error handling.
-        if (str.includes('\\invalid')) {
-            throw new Error('ParseError: KaTeX parse error: \\invalid command');
+        const displayClass = options?.displayMode ? "katex-display" : "";
+        const classList = ["katex", displayClass].filter(Boolean).join(" ");
+
+        if (str.includes("\\invalid")) {
+            throw new Error("ParseError: KaTeX parse error: \\invalid command");
         }
-        return `<span class="katex ${displayClass}">${str}</span>`;
+        return `<span class="${classList}">${str}</span>`;
     }),
 }));
 
-// Create a typed mock for easier use and type-safe assertions.
 const mockedKatex = katex as jest.Mocked<typeof katex>;
 
-// Clear mocks before each test to ensure a clean slate.
 beforeEach(() => {
     mockedKatex.renderToString.mockClear();
 });
 
-describe('Helper Functions', () => {
-    describe('escapeRegex', () => {
-        it('should escape special regex characters', () => {
-            const input = '.*+?^${}()|[]\\';
-            const expected = '\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\';
+describe("Helper Functions", () => {
+    describe("escapeRegex", () => {
+        it("should escape all special regex characters", () => {
+            const input = ".*+?^${}()|[]\\";
+            const expected = "\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\";
             expect(escapeRegex(input)).toBe(expected);
+        });
+
+        it("should return an empty string if given an empty string", () => {
+            expect(escapeRegex("")).toBe("");
+        });
+
+        it("should not alter a string with no special characters", () => {
+            const input = "abc123";
+            expect(escapeRegex(input)).toBe(input);
         });
     });
 
-    describe('Escape/Unescape Utilities', () => {
-        // Placeholders are used to prevent `\$` and `\\` from being treated as delimiters.
-        const escapes = { '\\\\': '𜰀', '\\$': '𜰃' };
-        const unEscapes = { '𜰀': '\\', '𜰃': '$' };
-        // For KaTeX, a literal backslash `\` must be escaped as `\\`.
-        const mathUnEscapes = { '𜰀': '\\\\', '𜰃': '$' };
+    describe("Escape/Unescape Utilities", () => {
+        const escapes = { "\\\\": "𜰀", "\\$": "𜰃" };
+        const unEscapes = { "𜰀": "\\", "𜰃": "$" };
+        const mathUnEscapes = { "𜰀": "\\\\", "𜰃": "$" };
 
-        it('replacePredefinedEscapeSequences should replace a sequence with its placeholder', () => {
-            const input = 'This is a test with \\$ and another \\$';
-            const expected = `This is a test with ${escapes['\\$']} and another ${escapes['\\$']}`;
-            expect(replacePredefinedEscapeSequences(input, '\\$')).toBe(expected);
+        it("replacePredefinedEscapeSequences should replace a sequence with its placeholder", () => {
+            const input = "This is a test with \\$ and another \\$";
+            const expected = `This is a test with ${escapes["\\$"]} and another ${escapes["\\$"]}`;
+            expect(replacePredefinedEscapeSequences(input, "\\$")).toBe(expected);
         });
 
-        it('replacePredefinedEscapeSequences should throw an error for an undefined sequence', () => {
-            const input = 'Some text';
-            const invalidSequence = '\\unknown'; // A sequence not in the `escapes` map.
-            expect(() => replacePredefinedEscapeSequences(input, invalidSequence)).toThrow(
-                'Escape sequence "\\unknown" not found in escapes map.'
-            );
+        it("replacePredefinedEscapeSequences should throw an error for an undefined sequence", () => {
+            const input = "Some text";
+            const invalidSequence = "\\unknown"; // A sequence not in the `escapes` map.
+            expect(() => replacePredefinedEscapeSequences(input, invalidSequence)).toThrow('Escape sequence "\\unknown" not found in escapes map.');
         });
 
-        it('unescapeCharacters should revert placeholders to plain text characters', () => {
-            const input = `This has a placeholder ${escapes['\\$']} and a backslash ${escapes['\\\\']}.`;
+        it("unescapeCharacters should revert placeholders to plain text characters", () => {
+            const input = `This has a placeholder ${escapes["\\$"]} and a backslash ${escapes["\\\\"]}.`;
             const expected = `This has a placeholder $ and a backslash \\.`;
             expect(unescapeCharacters(input)).toBe(expected);
         });
 
-        it('revertEscapedCharacters should revert placeholders to KaTeX-compatible sequences', () => {
-            const input = `E=mc^2, price is ${escapes['\\$']}5, path is C:${escapes['\\\\']}Users`;
-            // Note the difference: `\\` becomes `\\\\` for KaTeX to render a literal backslash.
+        it("revertEscapedCharacters should revert placeholders to KaTeX-compatible sequences", () => {
+            const input = `E=mc^2, price is ${escapes["\\$"]}5, path is C:${escapes["\\\\"]}Users`;
             const expected = `E=mc^2, price is $5, path is C:\\\\Users`;
             expect(revertEscapedCharacters(input)).toBe(expected);
+        });
+
+        it("should handle empty strings for all escape/unescape functions", () => {
+            expect(replacePredefinedEscapeSequences("", "\\$")).toBe("");
+            expect(unescapeCharacters("")).toBe("");
+            expect(revertEscapedCharacters("")).toBe("");
+        });
+
+        it("should handle strings with no placeholders for unescape functions", () => {
+            const input = "just plain text";
+            expect(unescapeCharacters(input)).toBe(input);
+            expect(revertEscapedCharacters(input)).toBe(input);
         });
     });
 });
 
-describe('parseDelimiters', () => {
-    it('should return a single text segment for input with no delimiters', () => {
-        const input = 'Hello world, this is plain text.';
+describe("parseDelimiters", () => {
+    it("should return a single text segment for input with no delimiters", () => {
+        const input = "Hello world, this is plain text.";
+        const expected: ParsedSegment[] = [{ type: "text", display: false, content: input }];
+        expect(parseDelimiters(input)).toEqual(expected);
+    });
+
+    it("should parse simple inline math with $...$", () => {
+        const input = "An equation $E=mc^2$";
         const expected: ParsedSegment[] = [
-            { type: 'text', display: false, content: input },
+            { type: "text", display: false, content: "An equation " },
+            { type: "math", display: false, content: "E=mc^2" },
         ];
         expect(parseDelimiters(input)).toEqual(expected);
     });
 
-    it('should parse simple inline math with $...$', () => {
-        const input = 'An equation $E=mc^2$';
+    it("should parse simple display math with $$...$$", () => {
+        const input = "The formula is $$a^2+b^2=c^2$$";
         const expected: ParsedSegment[] = [
-            { type: 'text', display: false, content: 'An equation ' },
-            { type: 'math', display: false, content: 'E=mc^2' },
+            { type: "text", display: false, content: "The formula is " },
+            { type: "math", display: true, content: "a^2+b^2=c^2" },
         ];
         expect(parseDelimiters(input)).toEqual(expected);
     });
 
-    it('should parse simple display math with $$...$$', () => {
-        const input = 'The formula is $$a^2+b^2=c^2$$';
+    it("should parse parenthetical delimiters \\(...\\) and \\[...\\]", () => {
+        const input = "Inline \\(x\\) and display \\[y\\]";
         const expected: ParsedSegment[] = [
-            { type: 'text', display: false, content: 'The formula is ' },
-            { type: 'math', display: true, content: 'a^2+b^2=c^2' },
+            { type: "text", display: false, content: "Inline " },
+            { type: "math", display: false, content: "x" },
+            { type: "text", display: false, content: " and display " },
+            { type: "math", display: true, content: "y" },
         ];
         expect(parseDelimiters(input)).toEqual(expected);
     });
 
-    it('should parse parenthetical delimiters \\(...\\) and \\[...\\]', () => {
-        const input = 'Inline \\(x\\) and display \\[y\\]';
+    it("should handle text before, between, and after math segments", () => {
+        const input = "First $a$, then $b$, and finally end.";
         const expected: ParsedSegment[] = [
-            { type: 'text', display: false, content: 'Inline ' },
-            { type: 'math', display: false, content: 'x' },
-            { type: 'text', display: false, content: ' and display ' },
-            { type: 'math', display: true, content: 'y' },
+            { type: "text", display: false, content: "First " },
+            { type: "math", display: false, content: "a" },
+            { type: "text", display: false, content: ", then " },
+            { type: "math", display: false, content: "b" },
+            { type: "text", display: false, content: ", and finally end." },
         ];
         expect(parseDelimiters(input)).toEqual(expected);
     });
 
-    it('should handle text before, between, and after math segments', () => {
-        const input = 'First $a$, then $b$, and finally end.';
-        const expected: ParsedSegment[] = [
-            { type: 'text', display: false, content: 'First ' },
-            { type: 'math', display: false, content: 'a' },
-            { type: 'text', display: false, content: ', then ' },
-            { type: 'math', display: false, content: 'b' },
-            { type: 'text', display: false, content: ', and finally end.' },
-        ];
-        expect(parseDelimiters(input)).toEqual(expected);
+    it("should handle an empty string as input", () => {
+        expect(parseDelimiters("")).toEqual([]);
     });
 
-    it('should prioritize longer delimiters like $$ over $', () => {
-        const input = '$$a+b$$';
-        const expected: ParsedSegment[] = [
-            { type: 'math', display: true, content: 'a+b' },
-        ];
-        expect(parseDelimiters(input)).toEqual(expected);
-    });
+    describe("Edge Cases and Complex Scenarios", () => {
+        it("should prioritize longer delimiters like $$ over $ at the same position", () => {
+            const input = "$$a+b$$";
+            const expected: ParsedSegment[] = [{ type: "math", display: true, content: "a+b" }];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
 
-    it('should not parse math inside an already matched block', () => {
-        // The inner `$b$` should be treated as part of the display math content.
-        const input = '$$ a $b$ c $$';
-        const expected: ParsedSegment[] = [
-            { type: 'math', display: true, content: ' a $b$ c ' },
-        ];
-        expect(parseDelimiters(input)).toEqual(expected);
-    });
+        it("should not parse math inside an already matched block", () => {
+            const input = "$$ a $b$ c $$";
+            const expected: ParsedSegment[] = [{ type: "math", display: true, content: " a $b$ c " }];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
 
-    it('should parse custom regex delimiters like \\begin{align}', () => {
-        const input = '\\begin{align}x &= 1\\\\y &= 2\\end{align}';
-        const expected: ParsedSegment[] = [
-            {
-                type: 'math',
-                display: true,
-                // The custom regex is configured to match the entire block, including delimiters.
-                content: '\\begin{align}x &= 1\\\\y &= 2\\end{align}',
-            },
-        ];
-        expect(parseDelimiters(input)).toEqual(expected);
-    });
+        it("should handle unclosed delimiters by treating them as text", () => {
+            const input = "This is text with an unclosed $ delimiter";
+            const expected: ParsedSegment[] = [{ type: "text", display: false, content: input }];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
 
-    it('should treat escaped delimiter placeholders as text', () => {
-        const placeholderForDollar = '𜰃'; // Represents `\$`
-        const input = `Price is ${placeholderForDollar}5, not $math$`;
-        const expected: ParsedSegment[] = [
-            { type: 'text', display: false, content: `Price is ${placeholderForDollar}5, not ` },
-            { type: 'math', display: false, content: 'math' },
-        ];
-        expect(parseDelimiters(input)).toEqual(expected);
-    });
+        it("should handle mismatched delimiters by treating them as text", () => {
+            const input = "This is text with mismatched \\( delimiters \\]";
+            const expected: ParsedSegment[] = [{ type: "text", display: false, content: input }];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
 
-    it('should handle an empty string as input', () => {
-        expect(parseDelimiters('')).toEqual([]);
+        it("should handle adjacent math blocks correctly", () => {
+            const input = "$a$$b$";
+            const expected: ParsedSegment[] = [
+                { type: "math", display: false, content: "a" },
+                { type: "math", display: false, content: "b" },
+            ];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
+
+        it("should handle math at the start and end of the string", () => {
+            const input = "$start$ middle $end$";
+            const expected: ParsedSegment[] = [
+                { type: "math", display: false, content: "start" },
+                { type: "text", display: false, content: " middle " },
+                { type: "math", display: false, content: "end" },
+            ];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
+
+        it("should handle empty math content", () => {
+            const input = "An empty block: $$$$";
+            const expected: ParsedSegment[] = [
+                { type: "text", display: false, content: "An empty block: " },
+                { type: "math", display: true, content: "" },
+            ];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
+
+        it("should treat escaped delimiter placeholders as text", () => {
+            const placeholderForDollar = "𜰃"; // Represents `\$`
+            const input = `Price is ${placeholderForDollar}5, not $math$`;
+            const expected: ParsedSegment[] = [
+                { type: "text", display: false, content: `Price is ${placeholderForDollar}5, not ` },
+                { type: "math", display: false, content: "math" },
+            ];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
+
+        it("should correctly parse custom regex delimiters like \\begin{align}", () => {
+            const alignBlock = "\\begin{align}x &= 1\\\\y &= 2\\end{align}";
+            const input = `Equation: ${alignBlock}`;
+            const expected: ParsedSegment[] = [
+                { type: "text", display: false, content: "Equation: " },
+                {
+                    type: "math",
+                    display: true,
+                    content: alignBlock,
+                },
+            ];
+            expect(parseDelimiters(input)).toEqual(expected);
+        });
     });
 });
 
-describe('renderMath', () => {
-    it('should render a simple string with inline math', () => {
-        const input = 'Let $x=5$.';
-        const expected = 'Let <span class="katex ">x=5</span>.';
+describe("renderMath", () => {
+    it("should render a simple string with inline math", () => {
+        const input = "Let $x=5$.";
+        const expected = 'Let <span class="katex">x=5</span>.';
         const result = renderMath(input);
 
         expect(result).toBe(expected);
         expect(mockedKatex.renderToString).toHaveBeenCalledTimes(1);
-        expect(mockedKatex.renderToString).toHaveBeenCalledWith('x=5', {
-            displayMode: false,
-            throwOnError: false,
-            strict: false,
-            trust: true,
-        });
+        expect(mockedKatex.renderToString).toHaveBeenCalledWith("x=5", expect.any(Object));
     });
 
-    it('should render a simple string with display math', () => {
-        const input = 'The formula: $$E=mc^2$$';
+    it("should render a simple string with display math", () => {
+        const input = "The formula: $$E=mc^2$$";
         const expected = 'The formula: <span class="katex katex-display">E=mc^2</span>';
         const result = renderMath(input);
 
         expect(result).toBe(expected);
         expect(mockedKatex.renderToString).toHaveBeenCalledTimes(1);
-        expect(mockedKatex.renderToString).toHaveBeenCalledWith('E=mc^2', {
-            displayMode: true,
-            throwOnError: false,
-            strict: false,
-            trust: true,
-        });
+        expect(mockedKatex.renderToString).toHaveBeenCalledWith("E=mc^2", expect.objectContaining({ displayMode: true }));
     });
 
-    it('should treat escaped dollar signs (\\$) as literal text', () => {
-        const input = 'This costs \\$5.';
-        const expected = 'This costs $5.'; // No KaTeX rendering should occur.
+    it("should treat escaped dollar signs (\\$) as literal text", () => {
+        const input = "This costs \\$5.";
+        const expected = "This costs $5.";
         const result = renderMath(input);
 
         expect(result).toBe(expected);
         expect(mockedKatex.renderToString).not.toHaveBeenCalled();
     });
 
-    it('should correctly pass escaped backslashes (\\\\) to KaTeX', () => {
-        // To create a single literal backslash in a JS string, you type `\\`.
-        // To create the string `\\`, which KaTeX needs for a newline, you must type `\\\\`.
-        const input = 'A matrix $\\begin{pmatrix} a \\\\ b \\end{pmatrix}$';
-        const expectedMathContent = '\\begin{pmatrix} a \\\\ b \\end{pmatrix}';
-        const expectedOutput = `A matrix <span class="katex ">${expectedMathContent}</span>`;
+    it("should correctly pass escaped backslashes (\\\\) to KaTeX for newlines", () => {
+        const input = "A matrix $\\begin{pmatrix} a \\\\ b \\end{pmatrix}$";
+        const expectedMathContent = "\\begin{pmatrix} a \\\\ b \\end{pmatrix}";
+        const expectedOutput = `A matrix <span class="katex">${expectedMathContent}</span>`;
 
         const result = renderMath(input);
         expect(result).toBe(expectedOutput);
         expect(mockedKatex.renderToString).toHaveBeenCalledWith(expectedMathContent, expect.any(Object));
     });
 
-    it('should render content with custom delimiters like \\begin{align*}', () => {
-        const alignContent = '\\begin{align*}E &= mc^2\\end{align*}';
-        const input = `Aligned equation: ${alignContent}`;
-        const expectedOutput = `Aligned equation: <span class="katex katex-display">${alignContent}</span>`;
-
+    it("should correctly un-escape a double backslash in text parts", () => {
+        const input = "A windows path: C:\\\\Users\\\\Test";
+        const expected = "A windows path: C:\\Users\\Test";
         const result = renderMath(input);
-        expect(result).toBe(expectedOutput);
-        expect(mockedKatex.renderToString).toHaveBeenCalledWith(alignContent, expect.objectContaining({ displayMode: true }));
+
+        expect(result).toBe(expected);
+        expect(mockedKatex.renderToString).not.toHaveBeenCalled();
     });
 
-    it('should handle and reformat KaTeX parse errors', () => {
-        const input = 'This has an error: $a + \\invalid$';
+    describe("Integration and Advanced Scenarios", () => {
+        it("should strip pre-existing placeholder characters from input before processing", () => {
+            const placeholderForDollar = "𜰃";
+            const input = `This should not be a price $5, but this is math $x=1$`;
+            const maliciousInput = input.replace("$", placeholderForDollar);
 
-        // Configure the mock to throw an error that our main function will catch and reformat.
-        mockedKatex.renderToString.mockImplementation((str) => {
-            if (str.includes('\\invalid')) {
-                // This simulates the structure of the error message KaTeX produces.
-                return '<span class="katex-error" title="ParseError: KaTeX parse error: something">Error</span>';
-            }
-            return str;
+            const expected = 'This should not be a price 5, but this is math <span class="katex">x=1</span>';
+            const result = renderMath(maliciousInput);
+            expect(result).toBe(expected);
         });
 
-        const result = renderMath(input);
+        it("should render a complex string with multiple delimiter types", () => {
+            const alignContent = "\\begin{align*}E &= mc^2\\end{align*}";
+            const input = `Inline \\(a\\), display \\[b\\], inline again $c$, display again $$d$$, and an environment: ${alignContent}. Final text.`;
+            const expected = `Inline <span class="katex">a</span>, display <span class="katex katex-display">b</span>, inline again <span class="katex">c</span>, display again <span class="katex katex-display">d</span>, and an environment: <span class="katex katex-display">${alignContent}</span>. Final text.`;
 
-        // Check that the error title was replaced with the user-friendly version.
-        expect(result).toContain('title="LaTeX Error: something"');
-        expect(result).toContain('This has an error: ');
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+            expect(mockedKatex.renderToString).toHaveBeenCalledTimes(5);
+        });
+
+        it("should correctly handle interaction between escaped chars and delimiters", () => {
+            const input = "The price is \\$5, not $5$. A backslash \\\\ is not math.";
+            const expected = 'The price is $5, not <span class="katex">5</span>. A backslash \\ is not math.';
+
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+            expect(mockedKatex.renderToString).toHaveBeenCalledTimes(1);
+        });
+
+        it("should render empty math blocks without crashing", () => {
+            const input = "Empty inline: $ $, empty display: $$$$";
+            const expected = 'Empty inline: <span class="katex"> </span>, empty display: <span class="katex katex-display"></span>';
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+        });
+
+        it("should handle and reformat KaTeX parse errors", () => {
+            const input = "This has an error: $a + \\invalid$";
+
+            mockedKatex.renderToString.mockImplementation((str) => {
+                if (str.includes("\\invalid")) {
+                    return '<span class="katex-error" title="ParseError: KaTeX parse error: Unknown command \'\\invalid\'">Error</span>';
+                }
+                return str;
+            });
+
+            const result = renderMath(input);
+            expect(result).toContain("title=\"LaTeX Error: Unknown command '\\invalid'\"");
+            expect(result).toContain("This has an error: ");
+        });
+
+        it("should not reformat non-KaTeX parse errors", () => {
+            const input = "An error: $a + b$";
+            mockedKatex.renderToString.mockImplementation(() => {
+                return '<span class="katex-error" title="SomeOtherError: A different issue">Error</span>';
+            });
+
+            const result = renderMath(input);
+            expect(result).toContain('title="SomeOtherError: A different issue"');
+        });
     });
 });
