@@ -14,7 +14,6 @@
         "LICENSE"
     ],
     "scripts": {
-        "dev": "tsc && node ./dist/index.js",
         "build": "tsc",
         "test": "jest --coverage",
         "test:serve": "jest --coverage && cd ./coverage/lcov-report && echo \"Code coverage server running at http://$(hostname -I | awk '{print $1}'):8005/\nHit CTRL-C to stop the server\" && npx http-server -p 8005 -s"

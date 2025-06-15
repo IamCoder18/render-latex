@@ -5,7 +5,7 @@ interface Delimiter {
     end: string;
     type: 'display' | 'inline';
     customRegex?: RegExp;
-    compiledRegex?: RegExp; // Added for pre-compiled regex
+    compiledRegex?: RegExp;
 }
 
 interface ParsedSegment {
@@ -21,7 +21,6 @@ interface Match {
     end: number;
 }
 
-// Named constants for better readability
 const BACKSLASH_PLACEHOLDER = '𜰀'; // Placeholder for a literal backslash
 const DOLLAR_PLACEHOLDER = '𜰃';   // Placeholder for a literal dollar sign
 
@@ -55,11 +54,10 @@ const delimiters: Delimiter[] = [
     },
 ].map(d => ({
     ...d,
-    // Explicitly cast the 'type' to ensure correct literal type inference
     type: d.type as 'display' | 'inline',
     // Pre-compile regex for efficiency
     compiledRegex: d.customRegex
-        ? new RegExp(d.customRegex.source, 'g') // Ensure global flag for iteration
+        ? new RegExp(d.customRegex.source, 'g')
         : new RegExp(
               String.raw`(?:${escapeRegex(d.start)})([\s\S]*?)(?:${escapeRegex(d.end)})`,
               'g'
@@ -120,7 +118,7 @@ const replacePredefinedEscapeSequences = (input: string, sequenceToReplace: stri
 
 /**
  * Unescapes characters in non-math text content by reverting internal placeholders
- * (e.g., `𜰃`) back to their original representations (e.g., `$`).
+ * (e.g., `DOLLAR_PLACEHOLDER`) back to their original representations (e.g., `$`).
  * @param input - The string to unescape.
  * @returns The unescaped string.
  */
@@ -130,7 +128,7 @@ const unescapeCharacters = (input: string): string => {
 
 /**
  * Reverts internal placeholders in math content back to their KaTeX-compatible
- * LaTeX representations. For instance, `𜰀` becomes `\\\\` for KaTeX to correctly
+ * LaTeX representations. For instance, `BACKSLASH_PLACEHOLDER` becomes `\\\\` for KaTeX to correctly
  * render a literal backslash within a formula.
  * @param input - The string containing placeholders to revert.
  * @returns The reverted string, ready for KaTeX rendering.
@@ -157,7 +155,7 @@ const parseDelimiters = (input: string): ParsedSegment[] => {
     delimiters.forEach((delimiter: Delimiter) => {
         // Use the pre-compiled regex
         const delimiterRegex = delimiter.compiledRegex!;
-        delimiterRegex.lastIndex = 0; // Reset lastIndex for exec method in a loop
+        delimiterRegex.lastIndex = 0;
 
         let match: RegExpExecArray | null;
         while ((match = delimiterRegex.exec(input)) !== null) {
