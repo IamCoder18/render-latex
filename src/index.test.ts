@@ -1,5 +1,5 @@
 import * as katex from "katex";
-import { renderMath, parseDelimiters, ParsedSegment, escapeRegex, replacePredefinedEscapeSequences, unescapeCharacters, revertEscapedCharacters } from "./index";
+import { renderMath, parseDelimiters, ParsedSegment, escapeRegex, replacePredefinedEscapeSequences, unescapeCharacters, revertEscapedCharacters, convertNewlinesToLatexBreaks } from "./index";
 
 jest.mock("katex", () => ({
     renderToString: jest.fn((str, options) => {
@@ -76,6 +76,35 @@ describe("Helper Functions", () => {
             const input = "just plain text";
             expect(unescapeCharacters(input)).toBe(input);
             expect(revertEscapedCharacters(input)).toBe(input);
+        });
+    });
+
+    describe("convertNewlinesToLatexBreaks", () => {
+        it("should convert single newlines to LaTeX line breaks", () => {
+            const input = "Line 1\nLine 2";
+            const expected = "Line 1 \\\\\\\\ Line 2";
+            expect(convertNewlinesToLatexBreaks(input)).toBe(expected);
+        });
+
+        it("should convert multiple newlines to multiple LaTeX line breaks", () => {
+            const input = "Line 1\n\n\nLine 2";
+            const expected = "Line 1 \\\\\\\\  \\\\\\\\  \\\\\\\\ Line 2";
+            expect(convertNewlinesToLatexBreaks(input)).toBe(expected);
+        });
+
+        it("should handle empty strings", () => {
+            expect(convertNewlinesToLatexBreaks("")).toBe("");
+        });
+
+        it("should handle strings with no newlines", () => {
+            const input = "No newlines here";
+            expect(convertNewlinesToLatexBreaks(input)).toBe(input);
+        });
+
+        it("should handle newlines at start and end", () => {
+            const input = "\nStart\nEnd\n";
+            const expected = " \\\\\\\\ Start \\\\\\\\ End \\\\\\\\ ";
+            expect(convertNewlinesToLatexBreaks(input)).toBe(expected);
         });
     });
 });
@@ -320,6 +349,62 @@ describe("renderMath", () => {
 
             const result = renderMath(input);
             expect(result).toContain('title="SomeOtherError: A different issue"');
+        });
+    });
+
+    describe("Newline Handling", () => {
+        beforeEach(() => {
+            // Reset mock to default behavior for newline tests
+            mockedKatex.renderToString.mockImplementation((str, options) => {
+                const displayClass = options?.displayMode ? "katex-display" : "";
+                const classList = ["katex", displayClass].filter(Boolean).join(" ");
+                return `<span class="${classList}">${str}</span>`;
+            });
+        });
+
+        it("should convert newlines to LaTeX line breaks in text segments", () => {
+            const input = "First line\nSecond line\nThird line";
+            const expected = "First line \\\\\\\\ Second line \\\\\\\\ Third line";
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+        });
+
+        it("should convert newlines in text but preserve them in math", () => {
+            const input = "Text line 1\nText line 2\n$\\begin{pmatrix} a \\\\ b \\end{pmatrix}$\nText line 3";
+            const expected = "Text line 1 \\\\\\\\ Text line 2 \\\\\\\\ <span class=\"katex\">\\begin{pmatrix} a \\\\ b \\end{pmatrix}</span> \\\\\\\\ Text line 3";
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+        });
+
+        it("should handle multiple consecutive newlines", () => {
+            const input = "Line 1\n\n\nLine 2";
+            const expected = "Line 1 \\\\\\\\  \\\\\\\\  \\\\\\\\ Line 2";
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+        });
+
+        it("should handle newlines at start and end of text", () => {
+            const input = "\nStart with newline\nEnd with newline\n";
+            const expected = " \\\\\\\\ Start with newline \\\\\\\\ End with newline \\\\\\\\ ";
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+        });
+
+        it("should not affect newlines inside LaTeX equations", () => {
+            const input = "$\\begin{align}\na &= 1\\\\\nb &= 2\n\\end{align}$";
+            const mathContent = "\\begin{align}\na &= 1\\\\\nb &= 2\n\\end{align}";
+            const expected = `<span class="katex">${mathContent}</span>`;
+            
+            const result = renderMath(input);
+            expect(result).toBe(expected);
+            expect(mockedKatex.renderToString).toHaveBeenCalledWith(mathContent, expect.any(Object));
+        });
+
+        it("should handle mixed newlines and escaped characters", () => {
+            const input = "Price: \\$5\nNext line\nMath: $x=1$\nFinal line";
+            const expected = "Price: $5 \\\\\\\\ Next line \\\\\\\\ Math: <span class=\"katex\">x=1</span> \\\\\\\\ Final line";
+            const result = renderMath(input);
+            expect(result).toBe(expected);
         });
     });
 });
