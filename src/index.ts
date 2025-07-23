@@ -139,6 +139,16 @@ const revertEscapedCharacters = (input: string): string => {
 };
 
 /**
+ * Converts newlines in text content to LaTeX line breaks.
+ * This function replaces `\n` with ` \\\\ ` which represents a line break in LaTeX.
+ * @param input - The text content to process.
+ * @returns The text with newlines converted to LaTeX line breaks.
+ */
+const convertNewlinesToLatexBreaks = (input: string): string => {
+    return input.replace(/\n/g, ' \\\\\\\\ ');
+};
+
+/**
  * Parses an input string to find and extract content enclosed within delimiters.
  * It segments the input into an array of objects, distinguishing between regular
  * text and math content. The logic collects all potential matches, sorts them to
@@ -254,7 +264,9 @@ const renderMath = (input: string): string => {
     let renderedOutput = '';
     parsedInput.forEach((match: ParsedSegment) => {
         if (match.type == 'text') {
-            renderedOutput += unescapeCharacters(match.content);
+            // Convert newlines to LaTeX line breaks in text segments
+            const textWithLineBreaks = convertNewlinesToLatexBreaks(match.content);
+            renderedOutput += unescapeCharacters(textWithLineBreaks);
         } else if (match.type == 'math') {
             renderedOutput += katex
                 .renderToString(revertEscapedCharacters(match.content), {
@@ -281,6 +293,7 @@ export {
     unescapeCharacters,
     revertEscapedCharacters,
     parseDelimiters,
+    convertNewlinesToLatexBreaks,
     // Export types for use in tests
     ParsedSegment,
     Delimiter,
